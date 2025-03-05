@@ -3,7 +3,7 @@
     <el-card class="login-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span>想知道你的成绩吗？</span>
+          <span>查查need成绩</span>
         </div>
       </template>
 

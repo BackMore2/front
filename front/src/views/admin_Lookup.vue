@@ -10,15 +10,6 @@
                 <span class="username">{{ username }}</span>
                 <el-icon class="el-icon--right"><arrow-down /></el-icon>
               </div>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item icon="user">个人信息</el-dropdown-item>
-                  <el-dropdown-item icon="setting">系统设置</el-dropdown-item>
-                  <el-dropdown-item icon="switch-button" @click="logout">
-                    退出登录
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
             </el-dropdown>
           </div>
         </div>
@@ -162,6 +153,20 @@ const chartInstances = ref([])
 const username = ref('张同学')
 const selectedSemester = ref('2023-2024-1')  // 修改为更精细的学期标识
 
+const props = defineProps({
+  studentId: {
+    type: String,
+    default: ''
+  }
+})
+
+// 修改数据获取逻辑（示例数据，需对接实际接口）
+onMounted(async () => {
+  if (props.studentId) {
+    // 这里可以添加根据学号获取数据的逻辑
+    username.value = props.studentId + ' 的成绩信息'
+  }
+})
 // 在script setup部分新增计算属性
 // 课程门数（示例数据需要补充credit字段）
 const courseCount = computed(() => filteredScoreData.value.length)
@@ -243,7 +248,7 @@ const scoreData = ref([
     professionalRanking: '5/150',
     course_category: '专业课' // 新增字段
   },
-  {
+    {
     semester: '2023-2024-1',
     course: '大学物理',
     score: 84,
@@ -457,7 +462,8 @@ const logout = () => {
   display: flex;
   justify-content: space-between;
 }
-
+</style>
+<style scoped>
 .dashboard {
   height: 100vh;
   background-color: #f5f5f5;

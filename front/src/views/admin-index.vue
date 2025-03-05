@@ -62,7 +62,58 @@
                 <el-form-item>
                   <el-button type="primary" @click="searchStudent">查询</el-button>
                 </el-form-item>
+                <el-dialog
+                    v-model="lookupDialogVisible"
+                    title="学生成绩详情"
+                    width="90%"
+                    top="5vh"
+                    destroy-on-close
+                >
+                  <admin-lookup :student-id="currentStudentId" @close="lookupDialogVisible = false" />
+                </el-dialog>
               </el-form>
+
+              <el-card shadow="hover" style="margin-top: 20px;">
+                <template #header>
+                  <div class="card-header">绩点排名</div>
+                </template>
+
+                <el-table
+                    :data="paginatedRankingData"
+                    stripe
+                    style="width: 100%"
+                    v-loading="loading"
+                >
+                  <el-table-column label="排名" prop="rank" width="100" />
+                  <el-table-column label="学号" prop="studentId" width="180" />
+                  <el-table-column label="姓名" prop="name" width="150" />
+                  <el-table-column label="平均绩点" prop="gpa" width="120">
+                    <template #default="scope">
+                      <el-tag type="success">{{ scope.row.gpa }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="120">
+                    <template #default="scope">
+                      <el-button
+                          type="primary"
+                          size="small"
+                          @click="showStudentDetail(scope.row.studentId)"
+                      >
+                        查看
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+
+                <el-pagination    style="margin-top: 20px;"
+                                  background
+                                  layout="prev, pager, next, sizes"
+                                  :page-sizes="[10, 20, 50]"
+                                  :total="rankingData.length"
+                                  v-model:current-page="currentPage"
+                                  v-model:page-size="pageSize"
+                />
+              </el-card>
             </el-card>
           </div>
 
@@ -156,6 +207,55 @@
                 </el-table-column>
               </el-table>
             </el-card>
+            <el-card shadow="hover" style="margin-top: 20px;">
+              <template #header>
+                <div class="card-header">新增学生信息</div>
+              </template>
+
+              <el-button type="primary" @click="dialogVisible = true">新增学生</el-button>
+
+              <el-dialog
+                  v-model="dialogVisible"
+                  title="新增学生信息"
+                  width="500px"
+                  height="400px"
+              >
+                <el-form
+                    :model="form"
+                    :rules="rules"
+                    ref="studentForm"
+                    label-width="80px"
+                >
+                  <el-form-item label="姓名" prop="name">
+                    <el-input v-model="form.name" placeholder="请输入学生姓名" />
+                  </el-form-item>
+                  <el-form-item label="学号" prop="studentId">
+                    <el-input v-model="form.studentId" placeholder="请输入学号" />
+                  </el-form-item>
+                  <el-form-item label="密码" prop="password">
+                    <el-input
+                        v-model="form.password"
+                        type="password"
+                        show-password
+                        placeholder="请输入密码"
+                    />
+                  </el-form-item>
+                  <el-form-item label="确认密码" prop="confirmPassword">
+                    <el-input
+                        v-model="form.confirmPassword"
+                        type="password"
+                        show-password
+                        placeholder="请再次输入密码"
+                    />
+                  </el-form-item>
+                </el-form>
+
+                <template #footer>
+                  <el-button @click="dialogVisible = false">取消</el-button>
+                  <el-button type="primary" @click="addStudent">确认添加</el-button>
+                </template>
+              </el-dialog>
+            </el-card>
           </div>
 
           <div v-else-if="activeMenu === 'modify'" key="modify" class="content-section">
@@ -195,11 +295,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref,computed } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Search, Plus, Edit } from '@element-plus/icons-vue'
+import AdminLookup from './admin_Lookup.vue'
 
+const lookupDialogVisible = ref(false)
+const currentStudentId = ref('')
 // 菜单项配置
 const menuItems = [
   { index: 'query', label: '查询', icon: Search },
@@ -215,11 +318,45 @@ const handleMenuSelect = (index) => {
   activeMenu.value = index
 }
 
+const currentPage = ref(1)
+const pageSize = ref(10)
+const loading = ref(false)
+const studentForm = ref(null)
+
+// 模拟排名数据（实际应来自接口）
+const rankingData = ref(
+    Array.from({length: 100}, (_, i) => ({
+      studentId: `202300${String(i+1).padStart(3, '0')}`,
+      name: `学生${i+1}`,
+      gpa: (Math.random() * 3 + 2).toFixed(2)
+    }))
+        .sort((a, b) => b.gpa - a.gpa) // 先排序
+        .map((item, index) => ({ // 后添加排名
+          ...item,
+          rank: index + 1
+        }))
+)
+// 计算分页数据
+const paginatedRankingData = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return rankingData.value.slice(start, end)
+})
+
+// 查看学生详情
+const showStudentDetail = (id) => {
+  currentStudentId.value = id
+  lookupDialogVisible.value = true
+}
 // 查询相关
 const studentId = ref('')
 const searchStudent = () => {
-  // 查询逻辑
-  console.log('查询学号:', studentId.value)
+  if (!studentId.value) {
+    ElMessage.warning('请输入学号')
+    return
+  }
+  currentStudentId.value = studentId.value
+  lookupDialogVisible.value = true
 }
 
 const editAcademicYear = (row) => {
@@ -312,6 +449,52 @@ const beforeUpload = (file) => {
   const handleError = (err, file) => {
     ElMessage.error(`文件 ${file.name} 上传失败`)
   }
+const dialogVisible = ref(false)
+const form = ref({
+  name: '',
+  studentId: '',
+  password: '',
+  confirmPassword: ''
+})
+
+// 验证规则
+const validatePassword = (rule, value, callback) => {
+  if (value !== form.value.password) {
+    callback(new Error('两次输入密码不一致!'))
+  } else {
+    callback()
+  }
+}
+
+const rules = {
+  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  studentId: [{ required: true, message: '请输入学号', trigger: 'blur' }],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    { validator: validatePassword, trigger: 'blur' }
+  ]
+}
+
+// 添加学生方法
+const addStudent = () => {
+  studentForm.value.validate(valid => {
+    if (valid) {
+      // 这里调用API接口
+      ElMessage.success('添加成功')
+      // 清空表单
+      studentForm.value.resetFields()
+      dialogVisible.value = false
+    }
+  })
+}
+const logout = () => {
+  ElMessage.success('已退出登录')
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -416,5 +599,40 @@ const beforeUpload = (file) => {
 .el-upload-dragger {
   width: 100%;
   height: 200px;
+}
+:deep(.el-dialog__body) {
+  padding: 20px;
+  height: 80vh;
+  overflow-y: auto;
+}
+
+.dashboard {
+  height: auto;
+  min-height: 600px;
+}
+
+.chart-container {
+  margin-top: 30px;
+  padding: 15px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
+.el-pagination {
+  justify-content: flex-end;
+  padding: 15px 0;
+}
+
+/* 表格操作按钮样式 */
+.el-button--small {
+  padding: 6px 12px;
+}
+:deep(.el-dialog__body) {
+  padding: 15px 20px;  /* 减少上下padding */
+  max-height: 60vh;    /* 设置最大高度 */
+  overflow-y: auto;
+}
+.el-form-item {
+  margin-bottom: 18px;
 }
 </style>
