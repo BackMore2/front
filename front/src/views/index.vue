@@ -156,11 +156,80 @@ import { UserFilled, Setting, SwitchButton, ArrowDown } from '@element-plus/icon
 import * as echarts from 'echarts';
 import { onBeforeUnmount } from 'vue';
 import { nextTick } from 'vue';
+import axios from 'axios'
+import request from '@/utils/request.js'
+
 
 const router = useRouter()
 const chartInstances = ref([])
-const username = ref('张同学')
-const selectedSemester = ref('2023-2024-1')  // 修改为更精细的学期标识
+
+// 获取学生成绩的方法
+const fetchStudentGrades = async () => {
+  try {
+    // 从本地存储获取用户信息
+    const userInfo = JSON.parse(localStorage.getItem('userInfo'))
+    const studentId = userInfo.user.userName // 假设用户名就是学号
+
+    const response = await axios.get('/system/grade/list', {
+      params: {
+        studentId: studentId,
+        academicYear: selectedSemester.value.split('-')[0],
+        semester: selectedSemester.value.split('-')[1]
+      },
+      headers: {
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      }
+    })
+
+    const { studentCourseGradeList, studentTotalGradeList } = response.data.data
+
+    // 转换课程成绩数据
+    scoreData.value = studentCourseGradeList.map(course => ({
+      semester: `${course.academicYear}-${course.semester}`,
+      course: course.courseName,
+      score: course.score,
+      credit: course.credit,
+      professionalRanking: course.ranking
+    }))
+
+    // 更新学期概览数据
+    if (studentTotalGradeList && studentTotalGradeList.length > 0) {
+      const totalGrade = studentTotalGradeList[0]
+      arithmeticAvgRank.value = totalGrade.averageRanking || '未知'
+      weightedAvgRank.value = totalGrade.weightedRanking || '未知'
+      gpaRank.value = totalGrade.gpaRanking || '未知'
+    }
+
+    // 更新学期列表
+    const uniqueSemesters = [...new Set(scoreData.value.map(item =>
+        `${item.semester.split('-')[0]}-${item.semester.split('-')[1]}`
+    ))]
+
+    academicSemesters.value = uniqueSemesters.map(semester => ({
+      value: semester,
+      label: `${semester}学年`
+    }))
+
+    // 如果当前选择的学期不在列表中，默认选择最新学期
+    if (!academicSemesters.value.some(s => s.value === selectedSemester.value)) {
+      selectedSemester.value = academicSemesters.value[0]?.value || '2023-2024-1'
+    }
+
+  } catch (error) {
+    ElMessage.error('获取成绩失败：' + error.message)
+  }
+}
+
+// 在 onMounted 中调用获取成绩的方法
+onMounted(() => {
+  fetchStudentGrades()
+  updateRadarCharts()
+})
+
+// 修改 filterScores 方法，触发成绩获取
+const filterScores = () => {
+  updateRadarCharts()
+}
 
 // 在script setup部分新增计算属性
 // 课程门数（示例数据需要补充credit字段）
@@ -192,138 +261,6 @@ const failedCourseCount = computed(() =>
     filteredScoreData.value.filter(item => item.score < 60).length
 )
 
-// 以下排名相关数据需要接入实际数据（示例使用固定值）
-const arithmeticAvgRank = ref('15/200')  // 平均分排名
-const weightedAvgRank = ref('18/200')    // 加权平均排名
-const gpaRank = ref('20/200')            // 绩点排名
-const creditGpa = ref('3.75')            // 平均学分绩点
-const creditGpaRank = ref('22/200')  // 新增平均学分绩点排名
-
-const academicSemesters = ref([
-  {
-    value: '2023-2024-1',
-    label: '2023-2024学年上半学期'
-  },
-  {
-    value: '2023-2024-2',
-    label: '2023-2024学年下半学期'
-  },
-  {
-    value: '2022-2023-1',
-    label: '2022-2023学年上半学期'
-  },
-  {
-    value: '2022-2023-2',
-    label: '2022-2023学年下半学期'
-  }
-])
-
-const scoreData = ref([
-  {
-    semester: '2023-2024-1',
-    course: '高等数学',
-    score: 85,
-    credit: 4.0,
-    professionalRanking: '12/150',
-    course_category: '专业课' // 新增字段
-  },
-  {
-    semester: '2023-2024-1',
-    course: '计算机导论',
-    score: 20,
-    credit: 3.0,
-    professionalRanking: '5/150',
-    course_category: '专业课' // 新增字段
-  },
-  {
-    semester: '2023-2024-1',
-    course: '软件工程导论',
-    score: 67,
-    credit: 3.0,
-    professionalRanking: '5/150',
-    course_category: '专业课' // 新增字段
-  },
-  {
-    semester: '2023-2024-1',
-    course: '大学物理',
-    score: 84,
-    credit: 3.0,
-    professionalRanking: '1/150',
-    course_category: '专业课' // 新增字段
-  },
-  {
-    semester: '2023-2024-1',
-    course: '大学英语',
-    score: 92,
-    credit: 3.0,
-    professionalRanking: '3/150',
-    course_category: '专业课' // 新增字段
-  },
-  {
-    semester: '2023-2024-2',
-    course: '计算机网络',
-    score: 88,
-    credit: 3.5,
-    professionalRanking: '8/150',
-    course_category: '专业课' // 新增字段
-  },
-  {
-    semester: '2022-2023-2',
-    course: '线性代数',
-    score: 80,
-    credit: 3.0,
-    professionalRanking: '25/140',
-    course_category: '专业课' // 新增字段
-  },
-  {
-    semester: '2022-2023-2',
-    course: '数据结构',
-    score: 90,
-    credit: 4.0,
-    professionalRanking: '6/140',
-    course_category: '专业课' // 新增字段
-  },
-  {
-    semester: '2023-2024-1',
-    course: '大学艺术通识',
-    score: 78,
-    credit: 2.0,
-    professionalRanking: '45/150',
-    course_category: '通识课' // 明确分类
-  }
-])
-
-// 新增计算属性，根据课程名称分类
-const categorizedScoreData = computed(() => {
-  return scoreData.value.map(item => {
-    return {
-      ...item,
-      course_category: (item.course.includes('通识') || item.course.includes('选修')) ? '通识课' : '专业课'
-    }
-  })
-})
-
-const filteredScoreData = computed(() =>
-    categorizedScoreData.value.filter(item => {
-      return item.semester === selectedSemester.value;
-    })
-)
-
-const totalCredits = computed(() =>
-    filteredScoreData.value.reduce((sum, item) => sum + item.credit, 0)
-)
-
-const calculateGPA = computed(() => {
-  const totalWeightedScore = filteredScoreData.value.reduce(
-      (sum, item) => sum + (item.score * item.credit), 0
-  )
-  return totalCredits.value > 0
-      ? (totalWeightedScore / totalCredits.value).toFixed(2)
-      : '0.00'
-})
-
-const totalRanking = ref('15/200')
-
 const getScoreTag = (score) => {
   if (score >= 90) return 'success'
   if (score >= 80) return 'warning'
@@ -337,12 +274,6 @@ const getScoreLevel = (score) => {
   if (score >= 60) return '及格'
   return '不及格'
 }
-
-const filterScores = () => {
-  updateRadarCharts();
-}
-
-
 
 // 新增计算属性，用于分类通识课和专业课
 const generalEducationCourses = computed(() => {

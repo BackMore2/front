@@ -325,16 +325,7 @@ const studentForm = ref(null)
 
 // 模拟排名数据（实际应来自接口）
 const rankingData = ref(
-    Array.from({length: 100}, (_, i) => ({
-      studentId: `202300${String(i+1).padStart(3, '0')}`,
-      name: `学生${i+1}`,
-      gpa: (Math.random() * 3 + 2).toFixed(2)
-    }))
-        .sort((a, b) => b.gpa - a.gpa) // 先排序
-        .map((item, index) => ({ // 后添加排名
-          ...item,
-          rank: index + 1
-        }))
+
 )
 // 计算分页数据
 const paginatedRankingData = computed(() => {
