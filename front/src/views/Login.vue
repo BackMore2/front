@@ -34,6 +34,7 @@ import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import request from '@/utils/request.js'
 
+
 const router = useRouter()
 const loginFormRef = ref(null)
 
@@ -44,14 +45,15 @@ const handleLogin = async () => {
         const response = await request.post('/login/user', {
           userName: loginForm.userName,
           password: loginForm.password,
-        })
+        });
 
         console.log('Login Response:', response); // 调试输出登录响应
 
         if (response.code === 200) {
-          localStorage.setItem('token', response.data[Constants.TOKEN])
+          // 假设后端返回的 token 在 response.token 字段中
+          localStorage.setItem('token', response.token);
 
-          const userInfoResponse = await request.get('/getInfo')
+          const userInfoResponse = await request.get('/getInfo');
           console.log('UserInfo Response:', userInfoResponse); // 调试输出用户信息响应
 
           // 解析并使用userInfoResponse中的数据
@@ -61,22 +63,23 @@ const handleLogin = async () => {
           // 根据角色跳转
           const roles = userInfo.roles || [];
           if (roles.includes('admin')) {
-            ElMessage.success('管理员登录成功')
-            router.push('/admin-index')
+            ElMessage.success('管理员登录成功');
+            router.push('/admin-index');
           } else {
-            ElMessage.success('学生登录成功')
-            router.push('/index')
+            ElMessage.success('学生登录成功');
+            router.push('/index');
           }
         } else {
-          ElMessage.error(response.msg || '登录失败')
+          ElMessage.error(response.msg || '登录失败');
         }
       } catch (error) {
         console.error('Error:', error); // 调试输出错误信息
-        ElMessage.error('登录失败：' + error.message)
+        ElMessage.error('登录失败：' + error.message);
       }
     }
-  })
+  });
 }
+
 
 const loginForm = reactive({
   userName: '',
@@ -112,7 +115,7 @@ const loginRules = {
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background-image: url("../assets/login.png");
+  background-image: url("../assets/test3.jpg");
   background-size: cover;
 }
 
