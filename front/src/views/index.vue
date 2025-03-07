@@ -163,6 +163,14 @@ import request from '@/utils/request.js'
 const router = useRouter()
 const chartInstances = ref([])
 
+const arithmeticAvgRank = ref('未知')  // 平均分排名
+const weightedAvgRank = ref('未知')    // 加权平均排名
+const gpaRank = ref('未知')            // 绩点排名
+const creditGpa = ref('0.00')          // 平均学分绩点
+const creditGpaRank = ref('未知')      // 平均学分绩点排名
+
+const academicSemesters = ref([])
+const scoreData = ref([])
 // 获取学生成绩的方法
 const fetchStudentGrades = async () => {
   try {
@@ -372,9 +380,21 @@ const updateRadarCharts = async () => {
 onMounted(() => {
   updateRadarCharts();
 });
-const logout = () => {
-  ElMessage.success('已退出登录')
-  router.push('/login')
+
+const logout = async () => {
+  try {
+    // 调用后端退出登录接口
+    await request.post('/logout')
+
+    // 清除本地存储
+    localStorage.removeItem('token')
+    localStorage.removeItem('userInfo')
+
+    // 跳转到登录页
+    router.push('/login')
+  } catch (error) {
+    ElMessage.error('退出登录失败：' + error.message)
+  }
 }
 </script>
 

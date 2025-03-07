@@ -8,8 +8,8 @@
       <!-- </template> -->
 
       <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" label-width="80px" class="form">
-        <el-form-item label="学号" prop="username">
-          <el-input v-model="loginForm.username" placeholder="请输入学号" prefix-icon="User" />
+        <el-form-item label="学号" prop="userName">
+          <el-input v-model="loginForm.userName" placeholder="请输入学号" prefix-icon="User" />
         </el-form-item>
 
         <el-form-item label="密码" prop="password">
@@ -37,43 +37,29 @@ import request from '@/utils/request.js'
 const router = useRouter()
 const loginFormRef = ref(null)
 
-const loginForm = reactive({
-  username: '',
-  password: ''
-})
-
-const loginRules = {
-  username: [
-    { required: true, message: '请输入学号', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' }
-  ]
-}
-
 const handleLogin = async () => {
   await loginFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        const response = await axios.post('/login', {
-          username: loginForm.username,
+        const response = await request.post('/login/user', {
+          userName: loginForm.userName,
           password: loginForm.password,
         })
 
-        if (response.data.code === 200) {
-          // 存储 token
-          localStorage.setItem('token', response.data.token)
+        console.log('Login Response:', response); // 调试输出登录响应
 
-          // 获取用户信息
-          const userInfoResponse = await axios.get('/getInfo', {
-            headers: { 'Authorization': 'Bearer ' + response.data.token }
-          })
+        if (response.code === 200) {
+          localStorage.setItem('token', response.data[Constants.TOKEN])
 
-          const userInfo = userInfoResponse.data
-          localStorage.setItem('userInfo', JSON.stringify(userInfo))
+          const userInfoResponse = await request.get('/getInfo')
+          console.log('UserInfo Response:', userInfoResponse); // 调试输出用户信息响应
+
+          // 解析并使用userInfoResponse中的数据
+          const userInfo = userInfoResponse.data || {};
+          console.log('User Info:', userInfo); // 调试输出用户信息
 
           // 根据角色跳转
-          const roles = userInfo.roles
+          const roles = userInfo.roles || [];
           if (roles.includes('admin')) {
             ElMessage.success('管理员登录成功')
             router.push('/admin-index')
@@ -82,16 +68,31 @@ const handleLogin = async () => {
             router.push('/index')
           }
         } else {
-          ElMessage.error(response.data.msg || '登录失败')
+          ElMessage.error(response.msg || '登录失败')
         }
       } catch (error) {
+        console.error('Error:', error); // 调试输出错误信息
         ElMessage.error('登录失败：' + error.message)
       }
     }
   })
 }
 
+const loginForm = reactive({
+  userName: '',
+  password: ''
+})
+
+const loginRules = {
+  userName: [
+    { required: true, message: '请输入学号', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' }
+  ]
+}
 </script>
+
 
 <style scoped>
 .title {
@@ -111,7 +112,7 @@ const handleLogin = async () => {
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background-image: url("../assets/login-background.jpg");
+  background-image: url("../assets/login.png");
   background-size: cover;
 }
 

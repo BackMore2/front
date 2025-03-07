@@ -300,6 +300,7 @@ import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Search, Plus, Edit } from '@element-plus/icons-vue'
 import AdminLookup from './admin_Lookup.vue'
+import request from "@/utils/request.js";
 
 const lookupDialogVisible = ref(false)
 const currentStudentId = ref('')
@@ -324,9 +325,7 @@ const loading = ref(false)
 const studentForm = ref(null)
 
 // 模拟排名数据（实际应来自接口）
-const rankingData = ref(
-
-)
+const rankingData = ref()
 // 计算分页数据
 const paginatedRankingData = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
@@ -482,9 +481,20 @@ const addStudent = () => {
     }
   })
 }
-const logout = () => {
-  ElMessage.success('已退出登录')
-  router.push('/login')
+const logout = async () => {
+  try {
+    // 调用后端退出登录接口
+    await request.post('/logout')
+
+    // 清除本地存储
+    localStorage.removeItem('token')
+    localStorage.removeItem('userInfo')
+
+    // 跳转到登录页
+    router.push('/login')
+  } catch (error) {
+    ElMessage.error('退出登录失败：' + error.message)
+  }
 }
 </script>
 
