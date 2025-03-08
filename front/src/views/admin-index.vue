@@ -279,7 +279,7 @@
                     <el-button
                         size="small"
                         type="danger"
-                        @click="deleteAcademicYear(scope.$index)"
+                        @click="deleteAcademicYear(scope.row)"
                     >
                       删除
                     </el-button>
@@ -295,15 +295,22 @@
 </template>
 
 <script setup>
-import { ref,computed } from 'vue'
+import { ref,computed, onMounted } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Search, Plus, Edit } from '@element-plus/icons-vue'
 import AdminLookup from './admin_Lookup.vue'
 import request from "@/utils/request.js";
-
+import  {ElCard} from "element-plus";
+import {customGet} from "@/utils/request.js";
+import { useRoute } from 'vue-router'
+import router from "@/router/index.js";
+const route = useRoute()
 const lookupDialogVisible = ref(false)
 const currentStudentId = ref('')
+const userInfo = ref({})
+const username = ref('管理员用户')
+
 // 菜单项配置
 const menuItems = [
   { index: 'query', label: '查询', icon: Search },
@@ -325,7 +332,17 @@ const loading = ref(false)
 const studentForm = ref(null)
 
 // 模拟排名数据（实际应来自接口）
-const rankingData = ref()
+const rankingData = ref([])
+const getRankingData = async () => {
+  try {
+    const response = await customGet('/admin/getTotalStudentGradeRank');
+    rankingData.value = response.data;
+  } catch (error) {
+    console.error('Error fetching ranking data:', error);
+    ElMessage.error('获取排名数据失败');
+  }
+};
+
 // 计算分页数据
 const paginatedRankingData = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
@@ -340,22 +357,23 @@ const showStudentDetail = (id) => {
 }
 // 查询相关
 const studentId = ref('')
-const searchStudent = () => {
+const searchStudent = async () => {
   if (!studentId.value) {
-    ElMessage.warning('请输入学号')
-    return
+    ElMessage.warning('请输入学号');
+    return;
   }
-  currentStudentId.value = studentId.value
-  lookupDialogVisible.value = true
-}
+  try {
+    const response = await customGet(`/grade/student/${studentId.value}`);
+    currentStudentId.value = studentId.value;
+    lookupDialogVisible.value = true;
+    // 更新当前学生信息
+    currentStudentInfo.value = response.data;
+  } catch (error) {
+    console.error('Error searching student:', error);
+    ElMessage.error('查询学生信息失败');
+  }
+};
 
-const editAcademicYear = (row) => {
-  console.log('编辑学年:', row)
-}
-
-const deleteAcademicYear = (index) => {
-  academicYearsList.value.splice(index, 1)
-}
 // 学年管理相关
 const startYear = ref(new Date().getFullYear())
 const endYear = ref(new Date().getFullYear() + 1)
@@ -389,6 +407,53 @@ const addAcademicYear = () => {
   academicYearsList.value.push(newYear)
   ElMessage.success(`成功添加学年：${newYear}`)
 }
+// 修改学年
+const editAcademicYear = async (row) => {
+  const editedYear = `${startYear.value}-${endYear.value} ${selectedSemester.value}`;
+
+  try {
+    await request.put('/academicYear/update', {
+      id: row.id, // 假设每个学年都有一个唯一的id
+      startYear: startYear.value,
+      endYear: endYear.value,
+      semester: selectedSemester.value
+    });
+    const index = academicYearsList.value.indexOf(row.fullYear);
+    if (index !== -1) {
+      academicYearsList.value[index] = editedYear;
+    }
+    ElMessage.success('学年信息修改成功');
+  } catch (error) {
+    console.error('Error updating academic year:', error);
+    ElMessage.error('修改学年信息失败');
+  }
+};
+// 删除学年
+const deleteAcademicYear = async (row) => {
+  try {
+    await request.delete(`/academicYear/delete/${row.id}`); // 假设每个学年都有一个唯一的id
+    const index = academicYearsList.value.indexOf(row.fullYear);
+    if (index !== -1) {
+      academicYearsList.value.splice(index, 1);
+    }
+    ElMessage.success('学年信息删除成功');
+  } catch (error) {
+    console.error('Error deleting academic year:', error);
+    ElMessage.error('删除学年信息失败');
+  }
+};
+const getAcademicYears = async () => {
+  try {
+    const response = await request.get('/academicYear/list');
+    academicYearsList.value = response.data.map(year => ({
+      id: year.id,
+      fullYear: `${year.startYear}-${year.endYear} ${year.semester}`
+    }));
+  } catch (error) {
+    console.error('Error fetching academic years:', error);
+    ElMessage.error('获取学年信息失败');
+  }
+};
 
 // 文件上传相关方法
 const handleFileUpload = (file) => {
@@ -431,9 +496,18 @@ const beforeUpload = (file) => {
     return false
   }}
 // 上传成功
-  const handleSuccess = (response, file) => {
-    ElMessage.success(`文件 ${file.name} 上传成功`)
+const handleSuccess = async (response, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file.raw);
+
+    await request.post('/grade/manage/import', formData);
+    ElMessage.success(`文件 ${file.name} 上传成功`);
+  } catch (error) {
+    console.error('Error uploading scores:', error);
+    ElMessage.error(`文件 ${file.name} 上传失败`);
   }
+};
 
 // 上传失败
   const handleError = (err, file) => {
@@ -470,17 +544,30 @@ const rules = {
 }
 
 // 添加学生方法
-const addStudent = () => {
-  studentForm.value.validate(valid => {
+const addStudent = async () => {
+  studentForm.value.validate(async valid => {
     if (valid) {
-      // 这里调用API接口
-      ElMessage.success('添加成功')
-      // 清空表单
-      studentForm.value.resetFields()
-      dialogVisible.value = false
+      try {
+        const gradeInfo = {
+          studentId: form.value.studentId,
+          courseName: '默认课程',
+          score: 0,
+          academicYear: `${startYear.value}-${endYear.value}`,
+          semester: selectedSemester.value
+        };
+
+        await request.post('/grade/manage/add', gradeInfo);
+        ElMessage.success('添加成功');
+        studentForm.value.resetFields();
+        dialogVisible.value = false;
+      } catch (error) {
+        console.error('Error adding student:', error);
+        ElMessage.error('添加学生信息失败');
+      }
     }
-  })
-}
+  });
+};
+
 const logout = async () => {
   try {
     // 调用后端退出登录接口
@@ -496,6 +583,31 @@ const logout = async () => {
     ElMessage.error('退出登录失败：' + error.message)
   }
 }
+onMounted(() => {
+  // 获取用户信息
+  const routeUserInfo = route.query.userInfo
+  // 在获取用户信息后添加调试日志
+  console.log('Admin userInfo:', userInfo.value)
+  // 在onMounted中补充校验
+  if (!userInfo.value.user) {
+    ElMessage.warning('请先登录管理员账号')
+    router.push('/login')
+  }
+  if (routeUserInfo) {
+    userInfo.value = JSON.parse(routeUserInfo)
+    localStorage.setItem('userInfo', routeUserInfo)
+  } else {
+    userInfo.value = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  }
+
+  // 设置管理员名称
+  username.value = userInfo.value.user?.userName || '管理员用户'
+
+  // 原有初始化逻辑
+  getRankingData()
+  getAcademicYears()
+})//生命周期钩子
+
 </script>
 
 <style scoped>

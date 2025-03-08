@@ -4,6 +4,7 @@ import router from './router'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import axios from "axios";
 
 const app = createApp(App)
 
@@ -11,6 +12,11 @@ const app = createApp(App)
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
     app.component(key, component)
 }
+
+//axios.get('/config.json').then(res=>{
+    //app.config.globalProperties.$config = res.data
+//})
+//export const globals=app.config.globalProperties
 
 app.use(router)
 app.use(ElementPlus)
