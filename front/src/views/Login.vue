@@ -1,11 +1,9 @@
 <template>
   <div class="login-container">
     <el-card class="login-card" shadow="hover">
-      <!-- <template #header> -->
       <div class="card-header">
         <span class="title">个人成绩查询系统</span>
       </div>
-      <!-- </template> -->
 
       <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" label-width="80px" class="form">
         <el-form-item label="学号" prop="userName">
@@ -17,7 +15,6 @@
         </el-form-item>
 
         <el-row type="flex" justify="center">
-
           <el-button type="primary" @click="handleLogin" style="width: 200px;">
             登录
           </el-button>
@@ -33,14 +30,17 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import request from '@/utils/request.js'
-
+import {customGet} from "@/utils/request.js";
 
 const router = useRouter()
 const loginFormRef = ref(null)
 
 const handleLogin = async () => {
+  console.log('handleLogin called'); // 调试信息
+
   await loginFormRef.value.validate(async (valid) => {
     if (valid) {
+      console.log('Form validation passed'); // 调试信息
       try {
         const response = await request.post('/login/user', {
           userName: loginForm.userName,
@@ -50,24 +50,28 @@ const handleLogin = async () => {
         console.log('Login Response:', response); // 调试输出登录响应
 
         if (response.code === 200) {
-          // 假设后端返回的 token 在 response.token 字段中
           localStorage.setItem('token', response.token);
 
-          const userInfoResponse = await request.get('/getInfo');
+          const userInfoResponse = await customGet('/getInfo');
           console.log('UserInfo Response:', userInfoResponse); // 调试输出用户信息响应
 
-          // 解析并使用userInfoResponse中的数据
-          const userInfo = userInfoResponse.data || {};
+          const userInfo = userInfoResponse;
           console.log('User Info:', userInfo); // 调试输出用户信息
 
-          // 根据角色跳转
-          const roles = userInfo.roles || [];
-          if (roles.includes('admin')) {
+          localStorage.setItem('userInfo', JSON.stringify(userInfo));
+          const roleKey = userInfo.user?.roles?.[0]?.roleKey || ''; // 使用可选链操作符防止报错
+          if (roleKey==='admin') {//更换为teacher身份则进入管理员界面
             ElMessage.success('管理员登录成功');
-            router.push('/admin-index');
-          } else {
+            router.push({
+              path: '/admin-index',
+              query: { userInfo: JSON.stringify(userInfo) }
+            });
+          } else if(roleKey==='student'){
             ElMessage.success('学生登录成功');
-            router.push('/index');
+            router.push({
+              path: '/index',
+              query: { userInfo: JSON.stringify(userInfo) }
+            });
           }
         } else {
           ElMessage.error(response.msg || '登录失败');
@@ -76,10 +80,11 @@ const handleLogin = async () => {
         console.error('Error:', error); // 调试输出错误信息
         ElMessage.error('登录失败：' + error.message);
       }
+    } else {
+      console.log('Form validation failed'); // 调试信息
     }
   });
 }
-
 
 const loginForm = reactive({
   userName: '',
@@ -96,10 +101,8 @@ const loginRules = {
 }
 </script>
 
-
 <style scoped>
 .title {
-  /* margin: 0px auto 30px auto; */
   text-align: center;
   color: #707070;
 }

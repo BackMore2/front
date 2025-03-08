@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 
 // 创建 axios 实例
 const service = axios.create({
-    baseURL: 'http://localhost:8080', // 基础 URL
+    baseURL: 'http://10.37.144.107:8080/', // 基础 URL
     timeout: 10000 // 请求超时时间
 })
 
@@ -50,6 +50,15 @@ service.interceptors.response.use(
   }
 );
 
+// 自定义方法，支持自定义 Content-Type 头部
+export function customGet(url, config = {}) {
+    const headers = {
+        ...config.headers,
+        'Content-Type': 'application/x-www-form-urlencoded' // 默认设置 Content-Type
+    };
+
+    return service.get(url, { ...config, headers });
+}
 
 
 export default service

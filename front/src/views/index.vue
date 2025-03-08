@@ -7,13 +7,11 @@
           <div class="user-info">
             <el-dropdown trigger="click">
               <div class="user-dropdown">
-                <span class="username">{{ username }}</span>
+                <span class="userName">{{ userName }}</span>
                 <el-icon class="el-icon--right"><arrow-down /></el-icon>
               </div>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item icon="user">个人信息</el-dropdown-item>
-                  <el-dropdown-item icon="setting">系统设置</el-dropdown-item>
                   <el-dropdown-item icon="switch-button" @click="logout">
                     退出登录
                   </el-dropdown-item>
@@ -99,7 +97,18 @@
               </div>
             </el-card>
           </el-col>
-
+          <div style="text-align: center; margin-top: 20px;">
+            <el-button type="primary" @click="openPhysicalTest">查看体测数据</el-button>
+          </div>
+          <el-dialog
+            v-model="physicalTestDialogVisible"
+            title="学生体测数据"
+            width="80%"
+            top="5vh"
+            destroy-on-close
+          >
+            <physical-test :userName="userName" />
+          </el-dialog>
           <el-col :span="18">
             <el-card shadow="hover">
               <template #header>
@@ -158,8 +167,10 @@ import { onBeforeUnmount } from 'vue';
 import { nextTick } from 'vue';
 import axios from 'axios'
 import request from '@/utils/request.js'
+import {customGet} from "@/utils/request.js";
+import PhysicalTest from '@/components/PhysicalTest.vue'
 
-
+//初始化数据
 const router = useRouter()
 const chartInstances = ref([])
 
@@ -172,8 +183,51 @@ const creditGpaRank = ref('未知')      // 平均学分绩点排名
 const academicSemesters = ref([])
 const scoreData = ref([])
 
-
 const selectedSemester = ref('2023-2024-1') // 初始化默认学期
+const physicalTestDialogVisible = ref(false);
+
+const openPhysicalTest = () => {
+  physicalTestDialogVisible.value = true;
+};
+
+// 新增用户信息响应式变量
+const userInfo = ref({})
+const userName = ref('')
+onMounted(() => {
+  // 优先从路由参数获取
+  const routeUserInfo = router.currentRoute.value.query.userInfo;
+    try {
+      // 使用 decodeURIComponent 解码 URL 编码的字符串
+      const decodedUserInfo = decodeURIComponent(routeUserInfo);
+      const parsedUserInfo = JSON.parse(decodedUserInfo);
+
+      // 提取 user 部分并直接赋值给 userInfo
+      userInfo.value = parsedUserInfo.user || {};
+
+      localStorage.setItem('userInfo', decodedUserInfo);
+    } catch (error) {
+      console.error('Failed to parse userInfo:', error);
+      userInfo.value = {}; // 设置默认值避免 undefined
+    }
+  // 设置用户名，使用可选链操作符防止访问 undefined
+  userName.value = userInfo.value?.userName || '未知用户';
+  // 动态设置默认学期为当前学年
+  const currentDate = new Date()
+  const currentYear = currentDate.getFullYear()
+  const currentMonth = currentDate.getMonth() + 1
+
+  // 判断当前学期（1月-6月为上半学年，7月-12月为下半学年）
+  const currentSemester = currentMonth >= 1 && currentMonth <= 6 ? '1' : '2'
+
+  // 设置默认学期
+  selectedSemester.value = `${currentYear-1}-${currentYear}-${currentSemester}`
+  console.log(selectedSemester.value);
+  console.log(localStorage.getItem('token'))
+  // 原有的数据获取逻辑
+  fetchStudentGrades()
+  updateRadarCharts()
+})//生命周期钩子
+console.log(userInfo);//测试
 
 // 新增计算属性 filteredScoreData
 const filteredScoreData = computed(() => {
@@ -181,22 +235,25 @@ const filteredScoreData = computed(() => {
 });
 const fetchStudentGrades = async () => {
   try {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    const studentId = userInfo.user.userName;
 
-    const response = await axios.get('/system/grade/list', {
+    const studentId = userName.value;
+    console.log("StudentId",studentId)
+
+    const response = await customGet('/system/grade/list', {
       params: {
         studentId: studentId,
-        academicYear: selectedSemester.value.split('-')[0],
-        semester: selectedSemester.value.split('-')[1]
+        academicYear: selectedSemester.value.split('-')[0]+'-'+selectedSemester.value.split('-')[1],
+        semester: selectedSemester.value.split('-')[2]
       },
       headers: {
-        'Authorization': 'Bearer ' + localStorage.getItem('token')
+        'Authorization':localStorage.getItem('token'),
+        'Content-Type': 'application/x-www-form-urlencoded' // 添加 Content-Type 头部
       }
     });
 
     const { studentCourseGradeList, studentTotalGradeList } = response.data.data;
-
+    console.log('studentCourseGradeList',studentCourseGradeList)
+    console.log('studentTotalGradeList',studentTotalGradeList)
     scoreData.value = studentCourseGradeList.map(course => ({
       semester: `${course.academicYear}-${course.semester}`,
       course: course.courseName,
@@ -229,18 +286,12 @@ const fetchStudentGrades = async () => {
   } catch (error) {
     ElMessage.error('获取成绩失败：' + error.message);
   }
-}
-
-// 在 onMounted 中调用获取成绩的方法
-onMounted(() => {
-  fetchStudentGrades()
-  updateRadarCharts()
-})
+};
 
 // 修改 filterScores 方法，触发成绩获取
 const filterScores = () => {
   updateRadarCharts()
-}
+};
 //更新相关计算属性
 // 课程门数（示例数据需要补充credit字段）
 const courseCount = computed(() => filteredScoreData.value.length);
@@ -278,14 +329,14 @@ const getScoreTag = (score) => {
   if (score >= 80) return 'warning'
   if (score >= 60) return 'info'
   return 'danger'
-}
+};
 
 const getScoreLevel = (score) => {
   if (score >= 90) return '优秀'
   if (score >= 80) return '良好'
   if (score >= 60) return '及格'
   return '不及格'
-}
+};
 
 const createRadarChart = (id, data, title) => {
   const chartDom = document.getElementById(id);
@@ -372,10 +423,6 @@ const updateRadarCharts = async () => {
   createRadarChart('professional-education-chart', profCourses, '专业课');
 };
 
-onMounted(() => {
-  updateRadarCharts();
-});
-
 const logout = async () => {
   try {
     // 调用后端退出登录接口
@@ -390,7 +437,7 @@ const logout = async () => {
   } catch (error) {
     ElMessage.error('退出登录失败：' + error.message)
   }
-}
+};
 </script>
 
 <style scoped>
@@ -430,7 +477,7 @@ const logout = async () => {
   cursor: pointer;
 }
 
-.user-dropdown .username {
+.user-dropdown .userName {
   margin-left: 10px;
   margin-right: 10px;
   color: #409EFF;
