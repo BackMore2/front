@@ -109,7 +109,7 @@ export default {
     async fetchDataForAllSemesters() {
       this.isLoading = true;
       try {
-        const response = await customGet('/physical_grade/list', {
+        const response = await customGet('/system/physical_grade/list', {
           params: {
             studentId: this.userName
           }

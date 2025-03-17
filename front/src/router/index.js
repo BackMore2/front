@@ -1,6 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import Login from '../views/Login.vue'
-import Index from '../views/index.vue'
+import { createRouter, createWebHistory } from 'vue-router';
+import Login from '../views/Login.vue';
+import Index from '../views/index.vue';
 import AdminIndex from "../views/admin-index.vue";
 import adminLookup from "../views/admin_Lookup.vue";
 import physicalTest from "../views/physical-test.vue";

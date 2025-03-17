@@ -47,8 +47,6 @@ const handleLogin = async () => {
           password: loginForm.password,
         });
 
-        console.log('Login Response:', response); // 调试输出登录响应
-
         if (response.code === 200) {
           localStorage.setItem('token', response.token);
 

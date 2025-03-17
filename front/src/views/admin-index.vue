@@ -29,8 +29,6 @@
               </div>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item icon="user">个人信息</el-dropdown-item>
-                  <el-dropdown-item icon="setting">系统设置</el-dropdown-item>
                   <el-dropdown-item icon="switch-button" @click="logout">
                     退出登录
                   </el-dropdown-item>
@@ -68,14 +66,25 @@
                     width="90%"
                     top="5vh"
                     destroy-on-close
+                    @close="closeLookupDialog"
                 >
-                  <admin-lookup :student-id="currentStudentId" @close="lookupDialogVisible = false" />
+                  <admin-lookup :student-id="currentStudentId" />
                 </el-dialog>
               </el-form>
 
               <el-card shadow="hover" style="margin-top: 20px;">
                 <template #header>
-                  <div class="card-header">绩点排名</div>
+                  <div class="card-header">
+                    <span>绩点排名</span>
+                    <el-select v-model="selectedMajor" placeholder="请选择专业" @change="filterRanking">
+                      <el-option
+                          v-for="major in majors"
+                          :key="major.value"
+                          :label="major.label"
+                          :value="major.value"
+                      />
+                    </el-select>
+                  </div>
                 </template>
 
                 <el-table
@@ -84,12 +93,12 @@
                     style="width: 100%"
                     v-loading="loading"
                 >
-                  <el-table-column label="排名" prop="rank" width="100" />
+                  <el-table-column label="排名" prop="avgGpaRank" width="180" />
                   <el-table-column label="学号" prop="studentId" width="180" />
-                  <el-table-column label="姓名" prop="name" width="150" />
-                  <el-table-column label="平均绩点" prop="gpa" width="120">
+                  <el-table-column label="姓名" prop="userName" width="180" />
+                  <el-table-column label="平均绩点" prop="avgGpa" width="180">
                     <template #default="scope">
-                      <el-tag type="success">{{ scope.row.gpa }}</el-tag>
+                      <el-tag type="success">{{ scope.row.avgGpa }}</el-tag>
                     </template>
                   </el-table-column>
                   <el-table-column label="操作" width="120">
@@ -318,43 +327,70 @@ const menuItems = [
   { index: 'modify', label: '修改', icon: Edit }
 ]
 
+const majors = [
+  { value:'软件工程',label:'软件工程' },
+  { value:'网络空间安全',label:'网络空间安全' },
+  { value:'人工智能',label:'人工智能' }
+];
 // 活动菜单
-const activeMenu = ref('query')
+const activeMenu = ref('query');
 
 // 菜单选择处理
 const handleMenuSelect = (index) => {
   activeMenu.value = index
 }
-
-const currentPage = ref(1)
-const pageSize = ref(10)
-const loading = ref(false)
-const studentForm = ref(null)
-
+const selectedMajor = ref(''); // 定义 selectedMajor
+const currentPage = ref(1);
+const pageSize = ref(10);
+const loading = ref(false);
+const studentForm = ref(null);
+const RData=ref([]);
 // 模拟排名数据（实际应来自接口）
-const rankingData = ref([])
+const rankingData = ref([]);
 const getRankingData = async () => {
   try {
     const response = await customGet('/admin/getTotalStudentGradeRank');
-    rankingData.value = response.data;
+    rankingData.value=response.data;
+    RData.value=response.data;
+    console.log("排名数据",rankingData);
   } catch (error) {
     console.error('Error fetching ranking data:', error);
     ElMessage.error('获取排名数据失败');
   }
 };
-
 // 计算分页数据
 const paginatedRankingData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return rankingData.value.slice(start, end)
-})
+  const start = (currentPage.value - 1) * pageSize.value;
+  const end = start + pageSize.value;
+  return rankingData.value.slice(start, end);
+});
 
+const filterRanking = () => {
+  if (!rankingData.value || !Array.isArray(rankingData.value)) {
+    console.error('rankingData is not defined or not an array');
+    return;
+  }
+  rankingData.value=RData.value;
+  const filteredData = selectedMajor.value
+      ? rankingData.value.filter(item => item.major === selectedMajor.value)
+      : rankingData.value;
+
+  rankingData.value = filteredData;
+  currentPage.value = 1;
+  pageSize.value = 10;
+};
 // 查看学生详情
-const showStudentDetail = (id) => {
-  currentStudentId.value = id
-  lookupDialogVisible.value = true
-}
+const showStudentDetail = async (id) => {
+  currentStudentId.value = id;
+  lookupDialogVisible.value = true;
+  await fetchStudentGrades();
+};
+// 关闭对话框时重置状态
+const closeLookupDialog = () => {
+  lookupDialogVisible.value = false;
+  currentStudentId.value = '';
+};
+
 // 查询相关
 const studentId = ref('')
 const searchStudent = async () => {
@@ -442,9 +478,9 @@ const deleteAcademicYear = async (row) => {
     ElMessage.error('删除学年信息失败');
   }
 };
-const getAcademicYears = async () => {
+/*const getAcademicYears = async () => {
   try {
-    const response = await request.get('/academicYear/list');
+    const response = await customGet('/academicYear/list');
     academicYearsList.value = response.data.map(year => ({
       id: year.id,
       fullYear: `${year.startYear}-${year.endYear} ${year.semester}`
@@ -453,7 +489,7 @@ const getAcademicYears = async () => {
     console.error('Error fetching academic years:', error);
     ElMessage.error('获取学年信息失败');
   }
-};
+};*/
 
 // 文件上传相关方法
 const handleFileUpload = (file) => {
@@ -471,20 +507,6 @@ const handleFileUpload = (file) => {
   return true
 }
 
-// 文件大小格式化
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-// 删除文件
-const removeFile = (index) => {
-  fileList.value.splice(index, 1)
-}
-
 // 上传前校验
 const beforeUpload = (file) => {
   const isValidType = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -494,25 +516,92 @@ const beforeUpload = (file) => {
   if (!isValidType) {
     ElMessage.error('只能上传 .xlsx, .xls 或 .csv 格式的文件')
     return false
-  }}
+  }
+
+  // 检查文件大小（限制为10MB）
+  const isLt10M = file.size / 1024 / 1024 < 10
+  if (!isLt10M) {
+    ElMessage.error('上传文件大小不能超过 10MB!')
+    return false
+  }
+
+  return true
+}
+
 // 上传成功
 const handleSuccess = async (response, file) => {
   try {
-    const formData = new FormData();
-    formData.append('file', file.raw);
+    const formData = new FormData()
+    formData.append('file', file.raw)
 
-    await request.post('/grade/manage/import', formData);
-    ElMessage.success(`文件 ${file.name} 上传成功`);
+    // 显示上传进度
+    const loading = ElLoading.service({
+      lock: true,
+      text: '正在上传，请稍候...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+
+    // 根据当前活动菜单确定接口地址
+    let apiUrl = '';
+    switch (activeMenu.value) {
+      case 'add':
+        apiUrl = '/student/course_grade/import'; // 导入学生课程成绩
+        break;
+      case 'modify':
+        apiUrl = '/system/physical_grade/import'; // 导入学生体测成绩
+        break;
+      case 'query':
+        apiUrl = '/student/total_grade/import'; // 导入学生总成绩
+        break;
+      default:
+        apiUrl = '/student/import'; // 导入学生账号密码
+    }
+
+    // 调用后端接口
+    const res = await request({
+      url: apiUrl,
+      method: 'post',
+      data: formData,
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+
+    loading.close()
+
+    if (res.code === 200) {
+      ElMessage.success('上传成功')
+      // 清空文件列表
+      fileList.value = []
+      // 刷新数据
+      getRankingData()
+    } else {
+      ElMessage.error(res.msg || '上传失败')
+    }
   } catch (error) {
-    console.error('Error uploading scores:', error);
-    ElMessage.error(`文件 ${file.name} 上传失败`);
+    ElMessage.error('上传失败：' + error.message)
   }
-};
+}
 
 // 上传失败
-  const handleError = (err, file) => {
-    ElMessage.error(`文件 ${file.name} 上传失败`)
-  }
+const handleError = (err, file) => {
+  ElMessage.error(`文件 ${file.name} 上传失败：${err.message}`)
+}
+
+// 删除文件
+const removeFile = (index) => {
+  fileList.value.splice(index, 1)
+}
+
+// 文件大小格式化
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
 const dialogVisible = ref(false)
 const form = ref({
   name: '',
@@ -588,11 +677,7 @@ onMounted(() => {
   const routeUserInfo = route.query.userInfo
   // 在获取用户信息后添加调试日志
   console.log('Admin userInfo:', userInfo.value)
-  // 在onMounted中补充校验
-  if (!userInfo.value.user) {
-    ElMessage.warning('请先登录管理员账号')
-    router.push('/login')
-  }
+
   if (routeUserInfo) {
     userInfo.value = JSON.parse(routeUserInfo)
     localStorage.setItem('userInfo', routeUserInfo)
@@ -604,8 +689,8 @@ onMounted(() => {
   username.value = userInfo.value.user?.userName || '管理员用户'
 
   // 原有初始化逻辑
-  getRankingData()
-  getAcademicYears()
+  getRankingData();
+  //getAcademicYears()
 })//生命周期钩子
 
 </script>

@@ -142,14 +142,8 @@
 
               <!-- 雷达图位置 -->
               <div class="chart-container">
-                <div v-if="generalEducationCourses.length > 0" id="general-education-chart"></div>
-                <div v-else class="no-data">
-                  <p>暂无通识课成绩数据</p>
-                </div>
-                <div v-if="professionalCourses.length > 0" id="professional-education-chart"></div>
-                <div v-else class="no-data">
-                  <p>暂无专业课成绩数据</p>
-                </div>
+                <div id="general-education-chart"></div>
+                <div id="professional-education-chart"></div>
               </div>
             </el-card>
             <!-- 体测数据对话框 -->
@@ -192,9 +186,14 @@ const gpaRank = ref('未知')            // 绩点排名
 const creditGpa = ref('0.00')          // 平均学分绩点
 const creditGpaRank = ref('未知')      // 平均学分绩点排名
 
-const academicSemesters = ref([])
-const scoreData = ref([])
-
+const academicSemesters = ref([
+  { value: '2024-2025-1', label: '2024-2025上半学期' },
+  { value: '2023-2024-1', label: '2023-2024上半学期' },
+  { value: '2023-2024-2', label: '2023-2024下半学期' } // 新增
+]);
+const scoreData =ref([]);
+const genEdCourses = ref([]);
+const profCourses = ref([]);
 const selectedSemester = ref('2024-2025-1') // 初始化默认学期
 const physicalTestDialogVisible = ref(false);
 
@@ -233,7 +232,6 @@ onMounted(() => {
 
   // 设置默认学期
   selectedSemester.value = `${currentYear-1}-${currentYear}-${currentSemester}`
-  console.log("测试学年",selectedSemester.value);
 
   // 原有的数据获取逻辑
   fetchStudentGrades()
@@ -243,7 +241,6 @@ onMounted(() => {
 const fetchStudentGrades = async () => {
   try {
     const studentId = userName.value;
-    console.log("StudentId", studentId);
 
     const response = await customGet('/system/grade/list', {
       params: {
@@ -256,30 +253,13 @@ const fetchStudentGrades = async () => {
         'Content-Type': 'application/x-www-form-urlencoded' // 添加 Content-Type 头部
       }
     });
-    const genEdCourses = await customGet('/system/grade',{
-      params: {
-        studentId: studentId,
-            academicYear: selectedSemester.value.split('-')[0] + '-' + selectedSemester.value.split('-')[1],
-            semester: selectedSemester.value.split('-')[2]
-      },
-      headers: {
-        'Authorization': localStorage.getItem('token'),
-            'Content-Type': 'application/x-www-form-urlencoded' // 添加 Content-Type 头部
-      }
-    });
-    const profCourses = await customGet('/system/grade', {
-      params: {
-        studentId: studentId,
-        academicYear: selectedSemester.value.split('-')[0] + '-' + selectedSemester.value.split('-')[1],
-        semester: selectedSemester.value.split('-')[2]
-      },
-      headers: {
-        'Authorization': localStorage.getItem('token'),
-        'Content-Type': 'application/x-www-form-urlencoded' // 添加 Content-Type 头部
-      }
-    });
-    const studentCourseGradeList= response.data.studentCourseGradeList;
-    const studentTotalGradeList= response.data.studentTotalGradeList;
+    const studentCourseGradeList = [
+      ...response.data.studentCourseGradeList, // 通识课
+      ...response.data.studentCourseGradeListother // 专业课
+    ];
+    genEdCourses.value = response.data.studentCourseGradeList;
+    profCourses.value = response.data.studentCourseGradeListother;
+    const studentTotalGradeList = response.data.studentTotalGradeList;
     scoreData.value = studentCourseGradeList.map(course => ({
       semester: `${course.academicYear}-${course.semester}`,
       course: course.courseName,
@@ -288,7 +268,6 @@ const fetchStudentGrades = async () => {
       professionalRanking: course.gpaRank || '未知',
       courseCategory: course.courseCategory // 后端返回的课程类别字段
     }));
-    console.log("测试成绩数据",scoreData.value);
     if (studentTotalGradeList && studentTotalGradeList.length > 0) {
       const totalGrade = studentTotalGradeList[0];
       arithmeticAvgRank.value = totalGrade.arithmeticAvgRank || '未知';
@@ -381,8 +360,8 @@ const createRadarChart = (id, data, title) => {
     tooltip: {},
     radar: {
       indicator: data.map(item => ({
-        name: item.course,
-        max: item.score < 60 ? 200 : 100, // 动态设置最大值
+        name: item.courseName,
+        max: item.highestScore < 60 ? 200 : 100, // 动态设置最大值
         min: 0
       })),
       shape: 'polygon',
@@ -423,7 +402,7 @@ const createRadarChart = (id, data, title) => {
       },
       data: [
         {
-          value: data.map(item => item.score),
+          value: data.map(item => item.highestScore),
           name: '成绩分布'
         }
       ],
@@ -439,9 +418,12 @@ onBeforeUnmount(() => {
 
 const updateRadarCharts = async () => {
   await nextTick(); // 等待DOM更新
-
-  createRadarChart('general-education-chart', genEdCourses, '通识课');
-  createRadarChart('professional-education-chart', profCourses, '专业课');
+  if (genEdCourses.value && genEdCourses.value.length > 0) {
+    createRadarChart('general-education-chart', genEdCourses.value, '通识课');
+  }
+  if (profCourses.value && profCourses.value.length > 0) {
+    createRadarChart('professional-education-chart', profCourses.value, '专业课');
+  }
 };
 
 const logout = async () => {
@@ -572,5 +554,4 @@ const logout = async () => {
   color: #909399;
   font-size: 14px;
 }
-
 </style>
