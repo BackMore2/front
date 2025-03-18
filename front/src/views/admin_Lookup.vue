@@ -32,8 +32,7 @@
               <el-select
                   v-model="selectedSemester"
                   placeholder="选择学期"
-                  @change="filterScores"
-                  style="width: 100%"
+                  @change="onSemesterChange"    style="width: 100%"
               >
                 <el-option
                     v-for="semester in academicSemesters"
@@ -186,28 +185,29 @@ const gpaRank = ref('未知')            // 绩点排名
 const creditGpa = ref('0.00')          // 平均学分绩点
 const creditGpaRank = ref('未知')      // 平均学分绩点排名
 
-const academicSemesters = ref([])
-const scoreData = ref([])
-const genEdCourses=ref([])
-const profCourses=ref([])
-
+const academicSemesters = ref([
+  { value: '2024-2025-1', label: '2024-2025上半学期' },
+  { value: '2023-2024-1', label: '2023-2024上半学期' },
+  { value: '2023-2024-2', label: '2023-2024下半学期' } // 新增
+]);
+const scoreData =ref([]);
+const genEdCourses = ref([]);
+const profCourses = ref([]);
 const selectedSemester = ref('2024-2025-1') // 初始化默认学期
 const physicalTestDialogVisible = ref(false);
-
-const props = defineProps({
-  studentId: {
-    type: String,
-    default: ''
-  }
-})
 
 const openPhysicalTest = () => {
   physicalTestDialogVisible.value = true;
 };
 
 // 新增用户信息响应式变量
-const userInfo = ref({})
-const userName = ref('')
+let userName = ref('')
+const props = defineProps({
+  studentId: {
+    type: String,
+    default: ''
+  }
+})
 onMounted(async () => {
   if (props.studentId) {
     try {
@@ -222,7 +222,7 @@ onMounted(async () => {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
       });
-
+      userName=props.studentId;
       scoreData.value = response.data.studentCourseGradeList.map(course => ({
         semester: `${course.academicYear}-${course.semester}`,
         course: course.courseName,
@@ -251,7 +251,6 @@ onMounted(() => {
 
   // 设置默认学期
   selectedSemester.value = `${currentYear-1}-${currentYear}-${currentSemester}`
-  console.log("测试学年",selectedSemester.value);
 
   // 原有的数据获取逻辑
   fetchStudentGrades()
@@ -299,11 +298,6 @@ const fetchStudentGrades = async () => {
       const uniqueSemesters = [...new Set(scoreData.value.map(item =>
           `${item.semester.split('-')[0]}-${item.semester.split('-')[1]}`))];
 
-      academicSemesters.value = uniqueSemesters.map(semester => ({
-        value: semester,
-        label: `${semester}学年`
-      }));
-
       if (!academicSemesters.value.some(s => s.value === selectedSemester.value)) {
         selectedSemester.value = academicSemesters.value[0]?.value || '2024-2025-1';
       }
@@ -313,7 +307,6 @@ const fetchStudentGrades = async () => {
       ElMessage.error('获取成绩失败：' + error.message);
     }}
 };
-
 // 算术平均分（保留两位小数）
 const arithmeticAvg = computed(() => {
   const total = scoreData.value.reduce((sum, item) => sum + item.score, 0);
@@ -438,11 +431,16 @@ onBeforeUnmount(() => {
 const updateRadarCharts = async () => {
   await nextTick(); // 等待DOM更新
   if (genEdCourses.value && genEdCourses.value.length > 0) {
-    createRadarChart('general-education-chart', genEdCourses.value, '通识课');
+    createRadarChart('general-education-chart', genEdCourses.value, '专业课');
   }
   if (profCourses.value && profCourses.value.length > 0) {
-    createRadarChart('professional-education-chart', profCourses.value, '专业课');
+    createRadarChart('professional-education-chart', profCourses.value, '通识课');
   }
+};
+//切换学年
+const onSemesterChange = async () => {
+  await fetchStudentGrades();
+  updateRadarCharts();
 };
 
 const logout = async () => {

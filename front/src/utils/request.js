@@ -4,7 +4,7 @@ import { ElMessage } from 'element-plus'
 //const serverUrl=globals.$config?.serverUrl||'http://10.37.171.166:8080'
 // 创建 axios 实例
 const service = axios.create({
-    baseURL: 'http://10.133.128.138:8080', // 基础 URL
+    baseURL: 'http://10.133.128.138:11236', // 基础 URL
     timeout: 10000 // 请求超时时间
 })
 
@@ -22,8 +22,6 @@ service.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-
-
 
 // 响应拦截器
 service.interceptors.response.use(
@@ -57,9 +55,25 @@ export function customGet(url, config = {}) {
         ...config.headers,
         'Content-Type': 'application/x-www-form-urlencoded' // 默认设置 Content-Type
     };
-
     return service.get(url, { ...config, headers });
 }
 
+// 新增自定义 POST 方法，支持自定义 Content-Type 头部
+export function customPost(url, data, config = {}) {
+    const headers = {
+        ...config.headers,
+        'Content-Type': 'multipart/form-data' // 默认设置 Content-Type
+    };
+
+    return service.post(url, data, { ...config, headers });
+}
+export function secPost(url, data, config = {}) {
+    const headers = {
+        ...config.headers,
+        'Content-Type': 'application/json' // 默认设置 Content-Type
+    };
+
+    return service.post(url, data, { ...config, headers });
+}
 
 export default service

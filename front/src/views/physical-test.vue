@@ -7,7 +7,6 @@
     <el-card class="student-info-card centered-card">
       <div class="student-info" style="text-align: center;">
         <p><strong>姓名:</strong> {{ studentInfo.name }}</p>
-        <p><strong>性别:</strong> {{ studentInfo.gender }}</p>
         <p><strong>学号:</strong> {{ studentInfo.studentId }}</p>
       </div>
     </el-card>
@@ -28,51 +27,51 @@
         <div class="card-container">
           <el-card v-for="(data, index) in allSemesterData" :key="index" class="data-card">
             <div class="card-header">
-              <h3>{{ data.year }}年 {{ data.semester }}学期</h3>
+              <h3>第 {{ data.academicYear }}学年</h3>
             </div>
             <div class="card-body">
               <div class="info-group">
                 <h4>体质总分与等级</h4>
-                <p>体质总分：{{ data.totalScore }}</p>
-                <p><span class="score">体质等级：{{ data.grade }}</span></p>
+                <p>体质总分：{{ data.totalGrade }}</p>
+                <p><span class="score">体质等级：{{ data.level }}</span></p>
               </div>
               <div class="info-group">
                 <h4>身体指标</h4>
                 <p>身高：{{ data.height }} cm</p>
                 <p>体重：{{ data.weight }} kg</p>
-                <p><span class="score">BMI得分：{{ data.weight_score }} 分</span></p>
+                <p><span class="score">BMI得分：{{ data.hwgrade }} 分</span></p>
               </div>
               <div class="info-group">
                 <h4>体能测试</h4>
                 <div class="test-item">
                   <span class="item-name">肺活量：</span>
-                  <span class="item-value">{{ data.lungCapacity }} ml</span>
-                  <span class="score">得分：{{ data.lungCapacity_score }} 分</span>
+                  <span class="item-value">{{ data.vitalCapacity}} ml</span>
+                  <span class="score">得分：{{ data.vitalCapacityGrade }} 分</span>
                 </div>
                 <div class="test-item">
                   <span class="item-name">中长跑：</span>
-                  <span class="item-value">{{ data.longRun }} min</span>
-                  <span class="score">得分：{{ data.longRun_score }} 分</span>
+                  <span class="item-value">{{ data.middleDistance}} min</span>
+                  <span class="score">得分：{{ data.middleDistanceGrade }} 分</span>
                 </div>
                 <div class="test-item">
                   <span class="item-name">五十米：</span>
-                  <span class="item-value">{{ data.fiftyMeter }} s</span>
-                  <span class="score">得分：{{ data.fiftyMeter_score }} 分</span>
+                  <span class="item-value">{{ data.run50m }} s</span>
+                  <span class="score">得分：{{ data.run50mGrade }} 分</span>
                 </div>
                 <div class="test-item">
                   <span class="item-name">立定跳远：</span>
-                  <span class="item-value">{{ data.standingJump }} m</span>
-                  <span class="score">得分：{{ data.standingJump_score }} 分</span>
+                  <span class="item-value">{{ data.standingLongJump }} m</span>
+                  <span class="score">得分：{{ data.standingLongJumpGrade }} 分</span>
                 </div>
                 <div class="test-item">
                   <span class="item-name">体前屈：</span>
-                  <span class="item-value">{{ data.flexibility }} cm</span>
-                  <span class="score">得分：{{ data.flexibility_score }} 分</span>
+                  <span class="item-value">{{ data.sitReach }} cm</span>
+                  <span class="score">得分：{{ data.sitReachGrade }} 分</span>
                 </div>
                 <div class="test-item">
                   <span class="item-name">仰卧引体：</span>
-                  <span class="item-value">{{ data.sitUps }} 次</span>
-                  <span class="score">得分：{{ data.sitUps_score }} 分</span>
+                  <span class="item-value">{{ data.situp }} 次</span>
+                  <span class="score">得分：{{ data.situpGrade }} 分</span>
                 </div>
               </div>
             </div>
@@ -86,6 +85,10 @@
 <script>
 import request from "@/utils/request.js";
 import { customGet } from "@/utils/request.js";
+import {ElMessage} from "element-plus";
+import {ref} from "vue";
+
+const gradeData = ref({});
 
 export default {
   props: {
@@ -98,7 +101,6 @@ export default {
     return {
       studentInfo: {
         name: '',
-        gender: '',
         studentId: ''
       },
       allSemesterData: [],
@@ -114,14 +116,14 @@ export default {
             studentId: this.userName
           }
         });
-        const gradeData = response.data.data;
-        if (gradeData) {
+        gradeData.value = response.data;
+        console.log(gradeData.value[0]);
+        if (gradeData.value) {
           this.studentInfo = {
-            name: gradeData.name,
-            gender: gradeData.gender,
-            studentId: gradeData.studentId
+            name: gradeData.value[0].userName,
+            studentId: gradeData.value[0].studentId
           };
-          this.allSemesterData = gradeData.semesterData;
+          this.allSemesterData = gradeData;
         } else {
           ElMessage.error('无记录');
         }

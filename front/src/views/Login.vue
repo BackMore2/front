@@ -61,8 +61,7 @@ const handleLogin = async () => {
           if (roleKey==='teacher') {//更换为teacher身份则进入管理员界面
             ElMessage.success('管理员登录成功');
             router.push({
-              path: '/admin-index',
-              query: { userInfo: JSON.stringify(userInfo) }
+              path: '/admin-index'
             });
           } else if(roleKey==='student'){
             ElMessage.success('学生登录成功');

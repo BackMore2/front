@@ -32,8 +32,7 @@
               <el-select
                   v-model="selectedSemester"
                   placeholder="选择学期"
-                  @change="filterScores"
-                  style="width: 100%"
+                  @change="onSemesterChange"    style="width: 100%"
               >
                 <el-option
                     v-for="semester in academicSemesters"
@@ -232,7 +231,8 @@ onMounted(() => {
 
   // 设置默认学期
   selectedSemester.value = `${currentYear-1}-${currentYear}-${currentSemester}`
-
+  console.log('Selected Semester:', selectedSemester.value);
+  console.log('Academic Semesters:', academicSemesters.value);
   // 原有的数据获取逻辑
   fetchStudentGrades()
   updateRadarCharts()
@@ -276,19 +276,6 @@ const fetchStudentGrades = async () => {
       creditGpa.value = totalGrade.creditGpa.toFixed(2);
       creditGpaRank.value = totalGrade.creditGpaRank || '未知';
     }
-
-    const uniqueSemesters = [...new Set(scoreData.value.map(item =>
-      `${item.semester.split('-')[0]}-${item.semester.split('-')[1]}`))];
-
-    academicSemesters.value = uniqueSemesters.map(semester => ({
-      value: semester,
-      label: `${semester}学年`
-    }));
-
-    if (!academicSemesters.value.some(s => s.value === selectedSemester.value)) {
-      selectedSemester.value = academicSemesters.value[0]?.value || '2024-2025-1';
-    }
-
     filterScores(); // 触发成绩过滤
   } catch (error) {
     ElMessage.error('获取成绩失败：' + error.message);
@@ -419,11 +406,16 @@ onBeforeUnmount(() => {
 const updateRadarCharts = async () => {
   await nextTick(); // 等待DOM更新
   if (genEdCourses.value && genEdCourses.value.length > 0) {
-    createRadarChart('general-education-chart', genEdCourses.value, '通识课');
+    createRadarChart('general-education-chart', genEdCourses.value, '专业课');
   }
   if (profCourses.value && profCourses.value.length > 0) {
-    createRadarChart('professional-education-chart', profCourses.value, '专业课');
+    createRadarChart('professional-education-chart', profCourses.value, '通识课');
   }
+};
+//切换学年
+const onSemesterChange = async () => {
+    await fetchStudentGrades();
+    updateRadarCharts();
 };
 
 const logout = async () => {

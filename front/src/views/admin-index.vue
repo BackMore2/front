@@ -52,8 +52,8 @@
               <el-form :inline="true" class="query-form">
                 <el-form-item label="学号">
                   <el-input
-                      v-model="studentId"
-                      placeholder="请输入学号"
+                      v-model="studentName"
+                      placeholder="请输入学生姓名"
                       clearable
                   />
                 </el-form-item>
@@ -76,7 +76,15 @@
                 <template #header>
                   <div class="card-header">
                     <span>绩点排名</span>
-                    <el-select v-model="selectedMajor" placeholder="请选择专业" @change="filterRanking">
+                    <el-select v-model="selectedYear" placeholder="请选择学年" @change="filterRanking" style="width: 150px; margin-right: 10px;">
+                      <el-option
+                          v-for="year in academicYears"
+                          :key="year.value"
+                          :label="year.label"
+                          :value="year.value"
+                      />
+                    </el-select>
+                    <el-select v-model="selectedMajor" placeholder="请选择专业" @change="filterRanking" style="width: 150px; margin-right: 10px;">
                       <el-option
                           v-for="major in majors"
                           :key="major.value"
@@ -128,55 +136,49 @@
 
         <!-- 增加页面 -->
           <div v-else-if="activeMenu === 'add'" key="add" class="content-section">
-            <!-- 学年信息管理 -->
-            <el-card shadow="hover" style="margin-bottom: 20px;">
-              <template #header>
-                <div class="card-header">学年信息管理</div>
-              </template>
-
-              <el-form :inline="true" class="academic-year-form">
-                <el-form-item label="起始学年">
-                  <el-input-number
-                      v-model="startYear"
-                      :min="2000"
-                      :max="2050"
-                      controls-position="right"
-                  />
-                </el-form-item>
-                <el-form-item label="终止学年">
-                  <el-input-number
-                      v-model="endYear"
-                      :min="2000"
-                      :max="2050"
-                      controls-position="right"
-                  />
-                </el-form-item>
-                <el-form-item label="学期">
-                  <el-select v-model="selectedSemester" placeholder="选择学期">
-                    <el-option label="上半学年" value="上半学年" />
-                    <el-option label="下半学年" value="下半学年" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item>
-                  <el-button type="primary" @click="addAcademicYear">新增学年</el-button>
-                </el-form-item>
-              </el-form>
-            </el-card>
-
             <!-- 导入学生成绩 -->
             <el-card shadow="hover">
               <template #header>
                 <div class="card-header">导入学生成绩</div>
               </template>
 
+              <el-radio-group v-model="importType" style="margin-bottom: 20px;">
+                <el-radio 
+                  value="physical"
+                  border 
+                  class="radio-button" 
+                  :class="{ 'active': importType === 'physical' }"
+                  @click="handleRadioClick('physical')"
+                >
+                  导入体测
+                </el-radio>
+                <el-radio 
+                  value="total"
+                  border 
+                  class="radio-button" 
+                  :class="{ 'active': importType === 'total' }"
+                  @click="handleRadioClick('total')"
+                >
+                  导入总成绩
+                </el-radio>
+                <el-radio 
+                  value="course"
+                  border 
+                  class="radio-button" 
+                  :class="{ 'active': importType === 'course' }"
+                  @click="handleRadioClick('course')"
+                >
+                  导入课程成绩
+                </el-radio>
+              </el-radio-group>
+
               <el-upload
                   class="upload-demo"
                   drag
-                  action="#"
+                  action=""
                   multiple
                   :on-change="handleFileUpload"
                   :file-list="fileList"
-                  :before-upload="beforeUpload"
                   :on-success="handleSuccess"
                   :on-error="handleError"
               >
@@ -268,34 +270,6 @@
           </div>
 
           <div v-else-if="activeMenu === 'modify'" key="modify" class="content-section">
-            <!-- 修改页面内容 -->
-            <el-card shadow="hover">
-              <template #header>
-                <div class="card-header">学年信息修改</div>
-              </template>
-
-              <el-table :data="academicYearsList" stripe style="width: 100%">
-                <el-table-column prop="fullYear" label="学年" />
-                <el-table-column label="操作">
-                  <template #default="scope">
-                    <el-button
-                        size="small"
-                        type="primary"
-                        @click="editAcademicYear(scope.row)"
-                    >
-                      编辑
-                    </el-button>
-                    <el-button
-                        size="small"
-                        type="danger"
-                        @click="deleteAcademicYear(scope.row)"
-                    >
-                      删除
-                    </el-button>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </el-card>
           </div>
         </transition>
       </el-main>
@@ -306,19 +280,24 @@
 <script setup>
 import { ref,computed, onMounted } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import {ElLoading, ElMessage} from 'element-plus'
 import { Search, Plus, Edit } from '@element-plus/icons-vue'
 import AdminLookup from './admin_Lookup.vue'
-import request from "@/utils/request.js";
+import request, {secPost} from "@/utils/request.js";
 import  {ElCard} from "element-plus";
 import {customGet} from "@/utils/request.js";
 import { useRoute } from 'vue-router'
 import router from "@/router/index.js";
+import {customPost} from "@/utils/request.js";
+
+
 const route = useRoute()
 const lookupDialogVisible = ref(false)
 const currentStudentId = ref('')
 const userInfo = ref({})
 const username = ref('管理员用户')
+const selectedYear=ref('20024-2025-1')
+const importType = ref('course')
 
 // 菜单项配置
 const menuItems = [
@@ -326,6 +305,12 @@ const menuItems = [
   { index: 'add', label: '增加', icon: Plus },
   { index: 'modify', label: '修改', icon: Edit }
 ]
+
+const academicYears =[
+  { value: '2024-2025-1', label: '2024-2025上半学期' },
+  { value: '2023-2024-1', label: '2023-2024上半学期' },
+  { value: '2023-2024-2', label: '2023-2024下半学期' }
+];
 
 const majors = [
   { value:'软件工程',label:'软件工程' },
@@ -345,14 +330,13 @@ const pageSize = ref(10);
 const loading = ref(false);
 const studentForm = ref(null);
 const RData=ref([]);
-// 模拟排名数据（实际应来自接口）
+// 排名数据（实际应来自接口）
 const rankingData = ref([]);
 const getRankingData = async () => {
   try {
     const response = await customGet('/admin/getTotalStudentGradeRank');
     rankingData.value=response.data;
     RData.value=response.data;
-    console.log("排名数据",rankingData);
   } catch (error) {
     console.error('Error fetching ranking data:', error);
     ElMessage.error('获取排名数据失败');
@@ -370,15 +354,24 @@ const filterRanking = () => {
     console.error('rankingData is not defined or not an array');
     return;
   }
-  rankingData.value=RData.value;
-  const filteredData = selectedMajor.value
-      ? rankingData.value.filter(item => item.major === selectedMajor.value)
-      : rankingData.value;
+  rankingData.value = RData.value;
+
+  // 根据学年和学期进行筛选
+  const filteredData = rankingData.value.filter(item => {
+    const matchesMajor = selectedMajor.value ? item.major === selectedMajor.value : true;
+    const matchesYear = selectedYear.value ?
+      item.academicYear === selectedYear.value.split('-')[0] + '-' + selectedYear.value.split('-')[1] : true;
+    const matchesSemester = selectedYear.value ? 
+      item.semester === selectedYear.value.split('-')[2] : true;
+    console.log("查看的数据",item.academicYear,item.semester,item.major)
+    return matchesMajor && matchesYear && matchesSemester;
+  });
 
   rankingData.value = filteredData;
   currentPage.value = 1;
   pageSize.value = 10;
 };
+
 // 查看学生详情
 const showStudentDetail = async (id) => {
   currentStudentId.value = id;
@@ -392,104 +385,27 @@ const closeLookupDialog = () => {
 };
 
 // 查询相关
-const studentId = ref('')
+const studentName = ref('')
 const searchStudent = async () => {
-  if (!studentId.value) {
-    ElMessage.warning('请输入学号');
+  if (!studentName.value) {
+    ElMessage.warning('请输入学生姓名');
     return;
   }
   try {
-    const response = await customGet(`/grade/student/${studentId.value}`);
-    currentStudentId.value = studentId.value;
-    lookupDialogVisible.value = true;
-    // 更新当前学生信息
-    currentStudentInfo.value = response.data;
+    rankingData.value = RData.value;
+    const SData = rankingData.value.filter(item => {
+      const matchesName = studentName.value ? item.userName === studentName.value : true;
+      return matchesName;
+    });
+    rankingData.value = SData;
   } catch (error) {
     console.error('Error searching student:', error);
     ElMessage.error('查询学生信息失败');
   }
 };
 
-// 学年管理相关
-const startYear = ref(new Date().getFullYear())
-const endYear = ref(new Date().getFullYear() + 1)
-const selectedSemester = ref('上半学年')
-const academicYearsList = ref([])
-
 // 文件上传相关
 const fileList = ref([])
-
-// 添加学年
-const addAcademicYear = () => {
-  if (startYear.value >= endYear.value) {
-    ElMessage.error('起始学年必须小于终止学年')
-    return
-  }
-  if (startYear.value - endYear.value>1) {
-    ElMessage.error('学年间隔为1年')
-    return
-  }
-
-  const newYear = `${startYear.value}-${endYear.value} ${selectedSemester.value}`
-
-  // 检查是否重复
-  const isDuplicate = academicYearsList.value.some(item => item === newYear)
-
-  if (isDuplicate) {
-    ElMessage.warning('该学年已存在')
-    return
-  }
-
-  academicYearsList.value.push(newYear)
-  ElMessage.success(`成功添加学年：${newYear}`)
-}
-// 修改学年
-const editAcademicYear = async (row) => {
-  const editedYear = `${startYear.value}-${endYear.value} ${selectedSemester.value}`;
-
-  try {
-    await request.put('/academicYear/update', {
-      id: row.id, // 假设每个学年都有一个唯一的id
-      startYear: startYear.value,
-      endYear: endYear.value,
-      semester: selectedSemester.value
-    });
-    const index = academicYearsList.value.indexOf(row.fullYear);
-    if (index !== -1) {
-      academicYearsList.value[index] = editedYear;
-    }
-    ElMessage.success('学年信息修改成功');
-  } catch (error) {
-    console.error('Error updating academic year:', error);
-    ElMessage.error('修改学年信息失败');
-  }
-};
-// 删除学年
-const deleteAcademicYear = async (row) => {
-  try {
-    await request.delete(`/academicYear/delete/${row.id}`); // 假设每个学年都有一个唯一的id
-    const index = academicYearsList.value.indexOf(row.fullYear);
-    if (index !== -1) {
-      academicYearsList.value.splice(index, 1);
-    }
-    ElMessage.success('学年信息删除成功');
-  } catch (error) {
-    console.error('Error deleting academic year:', error);
-    ElMessage.error('删除学年信息失败');
-  }
-};
-/*const getAcademicYears = async () => {
-  try {
-    const response = await customGet('/academicYear/list');
-    academicYearsList.value = response.data.map(year => ({
-      id: year.id,
-      fullYear: `${year.startYear}-${year.endYear} ${year.semester}`
-    }));
-  } catch (error) {
-    console.error('Error fetching academic years:', error);
-    ElMessage.error('获取学年信息失败');
-  }
-};*/
 
 // 文件上传相关方法
 const handleFileUpload = (file) => {
@@ -504,35 +420,15 @@ const handleFileUpload = (file) => {
   }
 
   fileList.value.push(file)
+  console.log("fileList",fileList.value)
   return true
 }
-
-// 上传前校验
-const beforeUpload = (file) => {
-  const isValidType = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-excel',
-    'text/csv'].includes(file.type)
-
-  if (!isValidType) {
-    ElMessage.error('只能上传 .xlsx, .xls 或 .csv 格式的文件')
-    return false
-  }
-
-  // 检查文件大小（限制为10MB）
-  const isLt10M = file.size / 1024 / 1024 < 10
-  if (!isLt10M) {
-    ElMessage.error('上传文件大小不能超过 10MB!')
-    return false
-  }
-
-  return true
-}
-
 // 上传成功
 const handleSuccess = async (response, file) => {
   try {
     const formData = new FormData()
     formData.append('file', file.raw)
+    console.log(formData)
 
     // 显示上传进度
     const loading = ElLoading.service({
@@ -541,26 +437,9 @@ const handleSuccess = async (response, file) => {
       background: 'rgba(0, 0, 0, 0.7)'
     })
 
-    // 根据当前活动菜单确定接口地址
-    let apiUrl = '';
-    switch (activeMenu.value) {
-      case 'add':
-        apiUrl = '/student/course_grade/import'; // 导入学生课程成绩
-        break;
-      case 'modify':
-        apiUrl = '/system/physical_grade/import'; // 导入学生体测成绩
-        break;
-      case 'query':
-        apiUrl = '/student/total_grade/import'; // 导入学生总成绩
-        break;
-      default:
-        apiUrl = '/student/import'; // 导入学生账号密码
-    }
-
     // 调用后端接口
-    const res = await request({
+    const res = await customPost({
       url: apiUrl,
-      method: 'post',
       data: formData,
       headers: {
         'Content-Type': 'multipart/form-data'
@@ -637,15 +516,12 @@ const addStudent = async () => {
   studentForm.value.validate(async valid => {
     if (valid) {
       try {
-        const gradeInfo = {
+        const studentInfo = {
           studentId: form.value.studentId,
-          courseName: '默认课程',
-          score: 0,
-          academicYear: `${startYear.value}-${endYear.value}`,
-          semester: selectedSemester.value
+          password: form.value.password
         };
 
-        await request.post('/grade/manage/add', gradeInfo);
+        await secPost('/admin/addStudentMessage', studentInfo);
         ElMessage.success('添加成功');
         studentForm.value.resetFields();
         dialogVisible.value = false;
@@ -672,9 +548,26 @@ const logout = async () => {
     ElMessage.error('退出登录失败：' + error.message)
   }
 }
+var apiUrl = '';
+const handleRadioClick = (type) => {
+  importType.value = type;
+  switch (importType.value) {
+    case 'physical':
+      apiUrl = '/system/physical_grade/import'; // 导入学生体测成绩
+      break;
+    case 'total':
+      apiUrl = '/student/total_grade/import'; // 导入学生总成绩
+      break;
+    case 'course':
+      apiUrl = '/student/course_grade/import'; // 导入学生课程成绩
+      break;
+  }
+  console.log(apiUrl);
+};
+
 onMounted(() => {
   // 获取用户信息
-  const routeUserInfo = route.query.userInfo
+  const routeUserInfo = JSON.parse(sessionStorage.getItem('userInfo'));
   // 在获取用户信息后添加调试日志
   console.log('Admin userInfo:', userInfo.value)
 
@@ -833,4 +726,32 @@ onMounted(() => {
 .el-form-item {
   margin-bottom: 18px;
 }
+
+.radio-button {
+  transition: all 0.3s ease;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #dcdfe6;
+  background-color: #f5f7fa;
+}
+
+.radio-button:hover {
+  background-color: rgba(64, 158, 255, 0.1);
+  border-color: #409eff;
+}
+
+.radio-button.active {
+  background-color: #409eff;
+  color: #fff;
+  border-color: #409eff;
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(64, 158, 255, 0.3);
+}
+
+.radio-button.active:hover {
+  background-color: #ffffff;
+  border-color: #409eff;
+}
+
 </style>

@@ -1,14 +1,3 @@
-/*import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-
-export default defineConfig({
-  plugins: [vue()],
-  resolve: {
-    alias: {
-      '@': '/src'
-    }
-  }
-})*/
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
@@ -33,7 +22,7 @@ export default defineConfig({
     proxy: {
       '/api1': {
         // 后台地址
-        target: 'http://localhost:8080/',
+        target: 'http://10.133.128.138:11236',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/api1/, '')
       }
